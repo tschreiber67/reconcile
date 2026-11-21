@@ -1,0 +1,34 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Data Reconciliation</title>
+<style>
+body{font:14px system-ui,sans-serif;margin:20px;color:#222}
+h1{font-size:20px}label{margin-right:12px}
+table{border-collapse:collapse;margin:10px 0}td,th{border:1px solid #bbb;padding:3px 8px;text-align:left}
+th{background:#eee}.conflict{background:#fde2e2}.chips span{display:inline-block;padding:2px 8px;margin:2px;border-radius:10px;background:#e8eef8}
+</style></head><body>
+<h1>Multi-source data reconciliation (synthetic facility registry)</h1>
+<div><label>Seed <input id="seed" value="7" size="4"></label>
+<label>Records <input id="records" value="60" size="4"></label>
+<label>Tolerance <input id="tol" value="0.02" size="5"></label>
+<label>Field <select id="field"><option value="">all</option><option>name</option><option>district</option><option>capacity</option><option>opened_year</option><option>status</option></select></label>
+<button onclick="load()">Reconcile</button></div>
+<div id="err" style="color:#b00"></div>
+<h3>Summary</h3><div id="summary" class="chips"></div>
+<h3>Pairwise agreement</h3><table id="pair"></table>
+<h3>Record-level issues</h3><div id="issues"></div>
+<h3>Field conflicts</h3><table id="conf"></table>
+<script>
+const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+async function load(){
+ const p=new URLSearchParams();
+ for(const i of ['seed','records','tol','field'])p.set(i,document.getElementById(i).value);
+ const r=await fetch('/api/reconcile?'+p);const d=await r.json();
+ if(!r.ok){err.textContent=d.error;return}
+ err.textContent='';
+ const s=d.summary;
+ summary.innerHTML='<span>records '+s.records+'</span><span>cells '+s.cells+'</span>'+Object.entries(s.labels).map(([k,v])=>'<span>'+k+' '+v+'</span>').join('');
+ pair.innerHTML='<tr><th>pair</th><th>equal</th><th>compared</th><th>agreement</th></tr>'+Object.entries(s.pairwise).map(([k,v])=>'<tr><td>'+esc(k)+'</td><td>'+v.equal+'</td><td>'+v.compared+'</td><td>'+v.agreement+'</td></tr>').join('');
+ issues.innerHTML=d.record_issues.length?d.record_issues.map(i=>'<div>'+esc(i.key)+': '+i.type+' '+esc(i.sources.join(', '))+'</div>').join(''):'none';
+ conf.innerHTML='<tr><th>key</th><th>field</th><th>values by source</th></tr>'+d.conflicts.map(c=>'<tr class="conflict"><td>'+esc(c.key)+'</td><td>'+c.field+'</td><td>'+Object.entries(c.raw).map(([n,v])=>esc(n)+'='+esc(JSON.stringify(v))).join(' | ')+'</td></tr>').join('');
+}
+load();
+</script></body></html>
